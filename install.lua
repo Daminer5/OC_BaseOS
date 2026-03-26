@@ -23,7 +23,6 @@ local function download(url)
   end
   if data == "" then
     return nil, "Empty response"
-    return nil, "Empty response"
   end
   return data
 end
