@@ -16,7 +16,6 @@ local function download(url)
   local ok, handle = pcall(internet.request, url)
   if not ok or not handle then
     return nil, "Failed to open URL"
-    return nil, "Failed to open URL"
   end
   local data = ""
   for chunk in handle do
