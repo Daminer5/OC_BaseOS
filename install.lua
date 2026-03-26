@@ -85,10 +85,6 @@ if install_root:sub(-1) ~= "/" then
   install_root = install_root .. "/"
 end
 
--- Normalize repo and branch to clean URL bases
-repo = repo:gsub("/+$", "")
-branch = branch:gsub("^/+", "")
-
 local github_base = repo .. "/" .. branch
 log("Using: " .. github_base)
 
