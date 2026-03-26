@@ -574,7 +574,7 @@ end
 
 Use raw file endpoint:
 
-https://raw.githubusercontent.com/user/repo/main/version.txt
+https://raw.githubusercontent.com/Daminer5/OC_BaseOS/main/version.txt
 
 Compare with local version.
 
@@ -756,7 +756,7 @@ return {
 
 Use raw GitHub:
 
-local BASE = "https://raw.githubusercontent.com/user/repo/main"
+local BASE = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/main"
 🧩 Core Updater Module
 updater.lua (drop-in)
 local internet = require("internet")
@@ -764,7 +764,7 @@ local serialization = require("serialization")
 
 local updater = {}
 
-local BASE = "https://raw.githubusercontent.com/user/repo/main"
+local BASE = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/main"
 
 -- =========================
 -- Helpers
@@ -1817,7 +1817,7 @@ Coordinate staged rollouts
 /config.lua
 ⚙️ Config
 return {
-  github_base = "https://raw.githubusercontent.com/user/repo/main",
+  github_base = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/main",
   channel = 1234,
   sync_interval = 300,
   broadcast_interval = 30

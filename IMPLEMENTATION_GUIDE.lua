@@ -1,0 +1,335 @@
+-- OC_BaseOS SCADA Controller - Implementation Guide
+-- 
+-- This document describes the complete implementation of the OC_BaseOS distributed
+-- monitoring and control system for OpenComputers 1.7.10.
+--
+-- =============================
+-- PROJECT STRUCTURE
+-- =============================
+--
+-- /lib/                          - Core libraries
+--   updater.lua                 - Node-side update manager with delta/SHA1 validation
+--   database.lua                - Node registry with persistence and queries
+--   alerts.lua                  - Threshold-based alert system
+--   node_comm.lua              - Node communication protocol (existing)
+--   orchestrator.lua           - Central update authority (enhanced)
+--   orch_updater.lua           - Orchestrator update logic (stub)
+--
+--   /hardware/                  - Hardware Abstraction Layer (NEW)
+--     hal.lua                   - Base interface & normalization
+--     br_reactor.lua            - Big Reactors passive reactor wrapper
+--     br_turbine.lua            - Big Reactors turbine wrapper
+--     mek_fission.lua           - Mekanism fission reactor wrapper
+--     mek_fusion.lua            - Mekanism fusion reactor wrapper
+--     mek_energy.lua            - Mekanism energy tank wrapper
+--     enderio_energy.lua        - EnderIO power bank wrapper
+--     thermal_energy.lua        - Thermal Expansion energy cell wrapper
+--     ae2_monitor.lua           - AE2 network monitor wrapper
+--
+--   /nodes/
+--     orchestrator.lua          - Central node (enhanced with auto-scaling)
+--
+--     /supervisor/
+--       Core.lua                - Node supervisor (enhanced with error handling)
+--
+--     /tasks/                   - Device monitoring tasks (NEW)
+--       reactor_monitor.lua     - Monitors all reactor types
+--       storage_monitor.lua     - Monitors all energy storage
+--       ae2_monitor.lua         - Monitors AE2 networks
+--
+--     /hmi/                     - Human-machine interface (NEW)
+--       dashboard.lua           - Touchscreen dashboard app
+--       widgets.lua             - UI component library
+--       alerts.lua             - Alert display system (existing)
+--       db_read.lua            - Database query interface (stub)
+--
+--     /config/                  - Configuration files
+--       example.br.reactor.cfg  - Template for reactor node
+--
+--
+-- =============================
+-- KEY COMPONENTS & RESPONSIBILITIES
+-- =============================
+--
+-- 1. UPDATER (/lib/updater.lua)
+--    - Manages node-side software updates
+--    - SHA1 validation for integrity
+--    - Delta detection (only download changed files)
+--    - Safe staging → validation → atomic swap
+--    - Automatic rollback on boot failure
+--    Functions: checkForUpdates(), getDelta(), stageFile(), applyUpdate(), rollback()
+--
+-- 2. HARDWARE ABSTRACTION LAYER (/lib/hardware/)
+--    - Wraps OpenComputers component API
+--    - Normalizes status format across device types
+--    - Graceful fallback if component missing
+--    - Standardized interface: getStatus(), setActive(), setControlRodLevel()
+--    Each device type: BR_Reactor, BR_Turbine, MEK_Fission, MEK_Fusion, etc.
+--
+-- 3. TASK MODULES (/nodes/tasks/)
+--    - Poll hardware devices periodically
+--    - Broadcast status on orchestrator channel
+--    - Share device status via modem network
+--    - Three core tasks: reactor_monitor, storage_monitor, ae2_monitor
+--
+-- 4. DATABASE SYSTEM (/lib/database.lua)
+--    - In-memory node registry with persistence
+--    - Staleness detection (60s timeout)
+--    - Query interface: getNode(), getAllNodes(), getByType(), getStats()
+--    - Auto-save every 30s to /var/node_registry.lua
+--    - Backup on each save
+--
+-- 5. ALERT SYSTEM (/lib/alerts.lua)
+--    - Thresholds for each device type (temp, fuel, capacity, efficiency)
+--    - Alert queue with severity levels (INFO, WARNING, CRITICAL)
+--    - Auto-check device status against thresholds
+--    - Broadcast alerts to HMI nodes periodically
+--
+-- 6. SUPERVISOR (/lib/nodes/supervisor/Core.lua)
+--    - Loads node-specific config
+--    - Graceful fallback to defaults if config missing
+--    - Registers node with orchestrator on boot
+--    - Sends heartbeat every 30s
+--    - Sends status broadcasts every 5s
+--    - Loads and runs task modules
+--    - Error handling: catches task crashes, continues running
+--    - Integrates with database for local tracking
+--
+-- 7. ORCHESTRATOR (/lib/nodes/orchestrator.lua)
+--    - GitHub sync: checks for new versions every 300s
+--    - Manifest caching: stores file list + SHA1 hashes
+--    - Delta serving: nodes request only changed files
+--    - Dynamic task assignment: spreads critical monitoring duties
+--    - Auto-scaling: detects underutilized nodes, assigns redundant tasks
+--    - Stale node cleanup: removes entries older than 1 hour
+--    - Version announcement: periodic broadcast to all nodes
+--
+-- 8. HMI DASHBOARD (/lib/nodes/hmi/dashboard.lua)
+--    - Touchscreen grid showing node status
+--    - Real-time alerts display
+--    - Node detail view with version, type, tasks
+--    - Device grid showing energy/temp/capacity
+--    - Multi-view support: Overview, Nodes, Devices, Alerts
+--    - Touch navigation (cycle views via header click)
+--    - Color coding: green (online), yellow (stale), red (offline)
+--
+--
+-- =============================
+-- NETWORK PROTOCOL
+-- =============================
+--
+-- Channel 1234 (orchestrator_channel) - Main control & status channel
+--   register     : Node → Orchestrator (announces existence)
+--   heartbeat    : Node → Orchestrator (keep-alive, version check)
+--   node_status  : Node → All (periodic status broadcast with device data)
+--   reactor_status    : Task → All (reactor monitoring data)
+--   storage_status    : Task → All (energy storage data)
+--   ae2_status        : Task → All (AE2 network data)
+--   version_announce  : Orchestrator → All (current version + assigned tasks)
+--   delta_request     : Node → Orchestrator (request changed files)
+--   delta_response    : Orchestrator → Node (file data)
+--   manifest_request  : Node → Orchestrator (request file list + hashes)
+--   manifest_response : Orchestrator → Node (manifest)
+--   task_assignment   : Orchestrator → Node (dynamic task assignments)
+--
+-- Channel 1235 (hmi_channel) - HMI-specific messages
+--   alerts : AlertSystem → HMI (alert queue)
+--
+--
+-- =============================
+-- CONFIGURATION
+-- =============================
+--
+-- Each node requires a config file: /nodes/config/{SERVICE_NAME}.cfg
+-- 
+-- Example: /nodes/config/reactor_1.cfg
+-- return {
+--   node_id = "reactor_1",
+--   node_type = "reactor",
+--   tasks = {"reactor_monitor"},
+--   version = "1.0.0",
+--   orchestrator_channel = 1234,
+--   heartbeat_interval = 30,
+--   status_broadcast_interval = 5,
+--   include_updater = true,
+--   file_hashes = {}
+-- }
+--
+-- Service name set via environment: SERVICE_NAME=reactor_1
+-- Or fallback to "default" if not set
+--
+-- Task modules can define custom config parameters:
+--   monitor_interval = 5        (seconds between broadcasts)
+--   critical_temp = 1200        (reactor critical threshold)
+--   warning_temp = 1000         (reactor warning threshold)
+--   capacity_critical = 0.05    (storage: critical at 5%)
+--   capacity_warning = 0.2      (storage: warning at 20%)
+--
+--
+-- =============================
+-- DATA FORMATS
+-- =============================
+--
+-- Device Status (normalized):
+-- {
+--   type = "br_reactor" | "mek_fission" | "mek_energy" | etc,
+--   state = true/false,
+--   temperature = 1000,           -- Kelvin (if applicable)
+--   energy_stored = 1000000,      -- RF
+--   energy_capacity = 10000000,   -- RF
+--   efficiency = 0.85,            -- 0.0-1.0
+--   throughput = 50000,           -- RF/t or items/s
+--   custom = {                    -- Device-specific fields
+--     fuel_amount = 100,
+--     control_rod_level = 50,
+--     etc...
+--   }
+-- }
+--
+-- Node Registry Entry:
+-- {
+--   node_id = "reactor_1",
+--   node_type = "reactor",
+--   tasks = {"reactor_monitor"},
+--   version = "1.0.0",
+--   status = "online" | "stale" | "offline",
+--   registered_at = 1234567890,
+--   last_heartbeat = 1234567890,
+--   uptime = 3600,
+--   file_hashes = {["/lib/updater.lua"] = "abc123..."}
+-- }
+--
+-- Alert:
+-- {
+--   id = 1,
+--   device_id = "reactor_1",
+--   device_type = "br_reactor",
+--   severity = 2,                -- 0=INFO, 1=WARNING, 2=CRITICAL
+--   severity_name = "CRITICAL",
+--   message = "Critical temperature reached",
+--   details = {temperature = 1200, threshold = 1200},
+--   timestamp = 1234567890,
+--   created_at = 3600.5
+-- }
+--
+--
+-- =============================
+-- DEPLOYMENT STEPS
+-- =============================
+--
+-- 1. Set up GitHub repository with manifest
+--    - Create /version.txt containing current version (e.g., "1.0.0")
+--    - Create /manifest.lua returning table of {files = {[path] = sha1_hash, ...}}
+--    - Upload all .lua files to match paths
+--
+-- 2. Deploy orchestrator node
+--    - Create computer with modem and internet card
+--    - Create /nodes/config/orchestrator.cfg
+--    - Create /cache directory
+--    - Run: SERVICE_NAME=orchestrator /lib/nodes/orchestrator.lua
+--
+-- 3. Deploy monitoring nodes (reactor, storage, ae2)
+--    - Create computer with modem + required component(s)
+--    - Create /nodes/config/{node_id}.cfg
+--    - Set SERVICE_NAME environment or use default
+--    - Run: SERVICE_NAME=reactor_1 /lib/nodes/supervisor/Core.lua
+--
+-- 4. Deploy HMI node
+--    - Create computer with modem + GPU + screen + keyboard
+--    - Create /nodes/config/hmi_1.cfg with tasks = {"dashboard"}
+--    - Run: SERVICE_NAME=hmi_1 /lib/nodes/supervisor/Core.lua
+--
+-- 5. Deploy database export node (optional)
+--    - Create computer with modem + internet
+--    - Run: /lib/nodes/db/db_exporter.lua
+--
+--
+-- =============================
+-- OPERATION & MONITORING
+-- =============================
+--
+-- Node Status Dashboard (HMI):
+--  - Touch header to cycle views: Overview → Nodes → Devices → Alerts
+--  - Color indicators: Green=online, Yellow=stale, Red=offline
+--  - Real-time updates every 2 seconds
+--
+-- Orchestrator Status:
+--  - Check /cache/version.txt for current managed version
+--  - Check /cache/manifest.lua for file manifest
+--  - Monitor console output for sync status
+--
+-- Node Local Database:
+--  - Query: local db = require("database"); db.load()
+--  - Get stats: db.getStats() returns {total, online, stale, offline}
+--  - Get nodes: db.getOnlineNodes() returns list of online nodes
+--
+-- Alert Management:
+--  - Critical alerts trigger immediate broadcast
+--  - Warnings logged but not blocking
+--  - Custom thresholds per device type in /lib/alerts.lua
+--
+--
+-- =============================
+-- EXTENDING THE SYSTEM
+-- =============================
+--
+-- Add New Device Type:
+--  1. Create /lib/hardware/{device_name}.lua wrapper
+--  2. Implement: new(address), getStatus(), setActive() methods
+--  3. Update task module to scan for device type
+--  4. Add thresholds to /lib/alerts.lua
+--
+-- Add New Task:
+--  1. Create /nodes/tasks/{task_name}.lua
+--  2. Implement: run(cfg) function
+--  3. Add to config: tasks = {"task_name"}
+--  4. Configure broadcast channel & interval
+--
+-- Custom Auto-Scaling:
+--  1. Enhance assignTasks() in /lib/nodes/orchestrator.lua
+--  2. Add node capability detection
+--  3. Define task priority and affinity rules
+--
+--
+-- =============================
+-- TROUBLESHOOTING
+-- =============================
+--
+-- Node not registering:
+--  - Check modem is open on correct channel (1234)
+--  - Verify network distance (signal loss over distance)
+--  - Check config file exists at /nodes/config/{SERVICE_NAME}.cfg
+--
+-- Tasks not running:
+--  - Check task module file exists in /nodes/tasks/
+--  - Verify task module exports {run = function(cfg)...end}
+--  - Check console for load errors
+--
+-- Devices not detected:
+--  - Verify component is attached and has correct type name
+--  - Check hardware wrapper for correct component.list() type
+--  - Devices must be on same computer as task
+--
+-- Updates not applying:
+--  - Verify GitHub base URL in config is correct
+--  - Check /cache directory has write permissions
+--  - Check manifest.lua has correct SHA1 hashes
+--
+-- Alerts not showing:
+--  - Verify alert thresholds are set in /lib/alerts.lua
+--  - Check task broadcasts status to correct channel
+--  - Verify HMI node is listening on channel 1235
+--
+--
+-- =============================
+-- ARCHITECTURE BENEFITS
+-- =============================
+--
+-- ✓ Modularity: Each component has single responsibility
+-- ✓ Scalability: Dynamic task assignment spreads load
+-- ✓ Resilience: Graceful degradation if devices offline
+-- ✓ Safety: Safe updates with delta + SHA1 + rollback
+-- ✓ Observability: Real-time alerts and status broadcasts
+-- ✓ Extensibility: New devices/tasks plug into framework
+-- ✓ Automation: Orchestrator manages node fleet automatically
+--

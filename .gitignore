@@ -1,0 +1,61 @@
+# Ignore generated OpenComputers/OpenOS install directories and runtime artifacts
+# (keep your project sources tracked in the repo; these are for local VM install data)
+
+# OpenOS imported install folders
+/bin/
+/boot/
+/etc/
+/home/
+/mnt/
+/usr/
+/lib/core/
+
+# OpenOS imported install core files in /lib/
+bit32.lua
+buffer.lua
+colors.lua
+database.lua
+devfs.lua
+event.lua
+filesystem.lua
+init.lua
+internet.lua
+io.lua
+keyboard.lua
+note.lua
+package.lua
+pipe.lua
+process.lua
+rc.lua
+serialization.lua
+sh.lua
+shell.lua
+sides.lua
+term.lua
+text.lua
+thread.lua
+transforms.lua
+tty.lua
+uuid.lua
+vt100.lua
+
+# runtime/generated data
+/tmp/
+/var/
+/logs/
+
+# emulator/world artifacts
+*.flp
+*.img
+*.log
+*.cache
+*.tmp
+
+# VSCode and environment files
+.vscode/
+*.swp
+*.swo
+
+# keep local build artifacts out
+build/
+coverage/

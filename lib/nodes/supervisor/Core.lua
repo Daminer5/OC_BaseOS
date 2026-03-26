@@ -3,28 +3,40 @@ local computer = require("computer")
 local event = require("event")
 local serialization = require("serialization")
 local fs = require("filesystem")
+local database = require("database")
 
 local modem = component.modem
 
 -- =============================
--- Load node config
+-- Load node config (with fallback)
 -- =============================
 local function loadConfig(service_name)
     local cfg_path = "/nodes/config/" .. service_name .. ".cfg"
-    if not fs.exists(cfg_path) then
-        error("Config file not found: " .. cfg_path)
+    
+    -- Try primary config
+    if fs.exists(cfg_path) then
+        local f = io.open(cfg_path, "r")
+        if f then
+            local data = f:read("*a")
+            f:close()
+            
+            local ok, cfg = pcall(load, "return "..data)
+            if ok and type(cfg) == "table" then
+                return cfg
+            end
+        end
     end
-
-    local f = io.open(cfg_path, "r")
-    local data = f:read("*a")
-    f:close()
-
-    local ok, cfg = pcall(load, "return "..data)
-    if not ok or type(cfg) ~= "table" then
-        error("Failed to load config for " .. service_name)
-    end
-
-    return cfg
+    
+    -- Fallback: return minimal defaults
+    return {
+        node_id = "node_" .. math.floor(computer.uptime()),
+        node_type = "generic",
+        tasks = {},
+        version = "1.0.0",
+        orchestrator_channel = 1234,
+        heartbeat_interval = 30,
+        file_hashes = {}
+    }
 end
 
 -- =============================
@@ -38,8 +50,13 @@ local tasks = cfg.tasks or {}
 local version = cfg.version or "1.0.0"
 local orchestrator_channel = cfg.orchestrator_channel or 1234
 local heartbeat_interval = cfg.heartbeat_interval or 30
+local status_broadcast_interval = cfg.status_broadcast_interval or 5
 
 modem.open(orchestrator_channel)
+
+-- Load database module for registry tracking
+database.load()
+database.registerNode(node_id, node_type, tasks, version, cfg.file_hashes or {})
 
 -- =============================
 -- Helper functions
@@ -68,6 +85,8 @@ end
 -- Registration & heartbeat
 -- =============================
 local last_heartbeat = 0
+local last_status_broadcast = 0
+local task_statuses = {}
 
 local function registerNode()
     send({
@@ -95,6 +114,25 @@ local function heartbeat()
     last_heartbeat = now
 end
 
+local function broadcastStatus()
+    local now = computer.uptime()
+    if now - last_status_broadcast < status_broadcast_interval then return end
+    
+    -- Include task status if available
+    send({
+        type = "node_status",
+        node_id = node_id,
+        node_type = node_type,
+        timestamp = os.time(),
+        uptime = computer.uptime(),
+        version = version,
+        tasks = tasks,
+        task_statuses = task_statuses
+    })
+    
+    last_status_broadcast = now
+end
+
 -- =============================
 -- Task loader
 -- =============================
@@ -103,9 +141,11 @@ local task_modules = {}
 for _, task_name in ipairs(tasks) do
     local ok, mod = pcall(require, "/nodes/tasks/"..task_name)
     if ok and type(mod.run) == "function" then
-        table.insert(task_modules, mod)
+        table.insert(task_modules, {name = task_name, module = mod})
+        task_statuses[task_name] = "running"
     else
         print("Failed to load task module:", task_name)
+        task_statuses[task_name] = "error"
     end
 end
 
@@ -142,16 +182,33 @@ registerNode()
 while true do
     -- heartbeat
     pcall(heartbeat)
+    
+    -- periodic status broadcast
+    pcall(broadcastStatus)
 
-    -- run tasks
-    for _, task in ipairs(task_modules) do
-        pcall(task.run, cfg)
+    -- run tasks with error handling
+    for _, task_info in ipairs(task_modules) do
+        local task_name = task_info.name
+        local task = task_info.module
+        
+        local ok, err = pcall(task.run, cfg)
+        if not ok then
+            task_statuses[task_name] = "error: " .. tostring(err)
+        else
+            task_statuses[task_name] = "running"
+        end
     end
 
     -- run updater if included as task
-    if cfg.include_updater and task_modules.updater then
-        pcall(task_modules.updater.run)
+    if cfg.include_updater then
+        local ok, updater = pcall(require, "updater")
+        if ok and type(updater.update) == "function" then
+            pcall(updater.update, cfg.orchestrator_address or "orchestrator", orchestrator_channel)
+        end
     end
+    
+    -- periodic database save
+    pcall(database.autoSave)
 
     os.sleep(1)
 end
