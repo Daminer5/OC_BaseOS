@@ -116,7 +116,7 @@ Create a computer with modem and internet card, then:
 return {
   node_id = "orchestrator",
   node_type = "orchestrator",
-  github_base = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS",
+  github_base = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/refs/heads/",
   branch = "dev",  -- switch to main for stable deployment
   sync_interval = 300,
   channel = 1234

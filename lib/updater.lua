@@ -7,7 +7,7 @@ local computer = require("computer")
 
 local updater_cfg_path = "/lib/updater.cfg"
 local updater_cfg = {
-  repo = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS",
+  repo = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/refs/heads/",
   branch = "dev"
 }
 

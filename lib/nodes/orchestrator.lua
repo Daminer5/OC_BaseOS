@@ -9,7 +9,7 @@ local modem = component.modem
 local cfg = require("config")
 
 -- Ensure branch-aware GitHub base (main/dev)
-cfg.github_base = cfg.github_base or "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/main"
+cfg.github_base = cfg.github_base or "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/refs/heads/main"
 cfg.branch = cfg.branch or "dev"
 local repoRoot = cfg.github_base:gsub("/(main|dev)$", "")
 cfg.github_base = repoRoot .. "/" .. cfg.branch
