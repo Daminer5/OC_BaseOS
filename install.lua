@@ -9,47 +9,6 @@ local computer = require("computer")
 local event = require("event")
 local serialization = require("serialization")
 
-local args = {...}
-local configPath = "/lib/updater.cfg"
-local updater_config = {
-  repo = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS",
-  branch = "dev"
-}
-
-if filesystem.exists(configPath) then
-  local ok, fn = pcall(loadfile, configPath)
-  if ok and fn then
-    local success, result = pcall(fn)
-    if success and type(result) == "table" then
-      for k,v in pairs(result) do updater_config[k] = v end
-    end
-  end
-end
-
-local requested = args[1]
-local install_root = args[2] or "/"
-if install_root:sub(-1) ~= "/" then install_root = install_root .. "/" end
-
-local branch
-local github_base
-if requested and requested:match("^https?://") then
-  github_base = requested
-else
-  branch = (requested and requested ~= "") and requested or updater_config.branch or "dev"
-  io.write("Select branch to use (main/dev) [" .. branch .. "]: ")
-  local input = io.read()
-  if input and input ~= "" then branch = input end
-  updater_config.branch = branch
-  github_base = (updater_config.repo or "https://raw.githubusercontent.com/Daminer5/OC_BaseOS") .. "/" .. branch
-  -- Persist selection in updater.cfg
-  local cfgData = "return {\n  repo = \"" .. updater_config.repo .. "\",\n  branch = \"" .. updater_config.branch .. "\"\n}\n"
-  writeFile(configPath, cfgData)
-end
-
-if not github_base then
-  github_base = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/dev"
-end
-
 local function err(msg)
   io.stderr:write("[install] ERROR: " .. msg .. "\n")
 end
@@ -103,9 +62,6 @@ local function loadManifest(data)
   if not ok or type(m) ~= "table" then
     return nil, "invalid manifest format"
   end
-  -- Support both manifest.forms:
-  -- 1) { files = { [path] = sha1, ... } }
-  -- 2) { common = {...}, nodes = { ... } }
   if m.files and type(m.files) == "table" then
     return m
   end
@@ -113,6 +69,47 @@ local function loadManifest(data)
     return m
   end
   return nil, "unknown manifest schema"
+end
+
+local args = {...}
+local configPath = "/lib/updater.cfg"
+local updater_config = {
+  repo = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS",
+  branch = "dev"
+}
+
+if filesystem.exists(configPath) then
+  local ok, fn = pcall(loadfile, configPath)
+  if ok and fn then
+    local success, result = pcall(fn)
+    if success and type(result) == "table" then
+      for k,v in pairs(result) do updater_config[k] = v end
+    end
+  end
+end
+
+local requested = args[1]
+local install_root = args[2] or "/"
+if install_root:sub(-1) ~= "/" then install_root = install_root .. "/" end
+
+local branch
+local github_base
+if requested and requested:match("^https?://") then
+  github_base = requested
+else
+  branch = (requested and requested ~= "") and requested or updater_config.branch or "dev"
+  io.write("Select branch to use (main/dev) [" .. branch .. "]: ")
+  local input = io.read()
+  if input and input ~= "" then branch = input end
+  updater_config.branch = branch
+  github_base = (updater_config.repo or "https://raw.githubusercontent.com/Daminer5/OC_BaseOS") .. "/" .. branch
+  -- Persist selection in updater.cfg
+  local cfgData = "return {\n  repo = \"" .. updater_config.repo .. "\",\n  branch = \"" .. updater_config.branch .. "\"\n}\n"
+  writeFile(configPath, cfgData)
+end
+
+if not github_base then
+  github_base = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/dev"
 end
 
 local function detectHardware()
