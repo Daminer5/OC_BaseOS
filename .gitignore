@@ -9,6 +9,7 @@
 /mnt/
 /usr/
 /lib/core/
+/lib/tools/
 
 # OpenOS imported install core files in /lib/
 bit32.lua
