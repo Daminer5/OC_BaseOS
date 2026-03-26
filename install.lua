@@ -85,6 +85,10 @@ if install_root:sub(-1) ~= "/" then
   install_root = install_root .. "/"
 end
 
+-- Normalize repo and branch to clean URL bases
+repo = repo:gsub("/+$", "")
+branch = branch:gsub("^/+", "")
+
 local github_base = repo .. "/" .. branch
 log("Using: " .. github_base)
 
@@ -118,9 +122,11 @@ local manifest_url = github_base .. "/manifest.lua"
 
 local version_data = download(version_url)
 if not version_data then
-  log("Failed to download version")
+  log("Failed to download version.txt from: " .. version_url)
   return
 end
+
+log("Downloaded version.txt: " .. version_data:gsub("\n", ""))
 
 local manifest_data = download(manifest_url)
 if not manifest_data then
