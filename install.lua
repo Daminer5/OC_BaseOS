@@ -54,7 +54,7 @@ end
 local args = {...}
 local configPath = "/lib/updater.cfg"
 local defaultBranch = "dev"
-local defaultRepo = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/refs/heads/"
+local defaultRepo = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/refs/heads"
 local branch = defaultBranch
 local repo = defaultRepo
 
