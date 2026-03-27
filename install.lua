@@ -249,5 +249,26 @@ ensureDir(install_root .. "cache")
 writeFile(install_root .. "cache/version.txt", version_data)
 writeFile(install_root .. "cache/manifest.lua", manifest_data)
 
+-- Save node type for future boots
+local function saveNodeType(nodeType)
+  writeFile(install_root .. "/etc/node_type", nodeType .. "\n")
+end
+
+saveNodeType(node_type)
+
 log("Installation complete!")
+
+-- Start services via kickstarter
+log("Starting node services...")
+local shell_ok, shell = pcall(require, "shell")
+if shell_ok and shell then
+  local result = shell.execute("kickstart.lua " .. node_type)
+  if result == 0 then
+    log("Services started successfully!")
+  else
+    log("WARNING: Service startup returned non-zero exit code: " .. tostring(result))
+  end
+else
+  log("WARNING: Could not start services - shell module not available")
+end
 
