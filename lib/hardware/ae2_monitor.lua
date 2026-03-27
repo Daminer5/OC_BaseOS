@@ -23,25 +23,26 @@ function AE2_Monitor:getStatus()
   end
   
   local ok, result = pcall(function()
-    local stored = self.device.getStoredPower() or 0
-    local capacity = self.device.getMaxStoredPower() or 1
-    
+    local online_cpus = self.device.getOnlineCPUCount() or 0
+    local total_cpus = self.device.getCPUCount() or 1
+    local cpu_usage = (total_cpus - online_cpus) / total_cpus * 100
+    local item_types = self.device.getItemCount() or 0
+    local fluid_types = self.device.getFluidCount() or 0
+    local item_used = self.device.getStoredItemCount() or 0
+    local item_capacity = self.device.getItemStorageCapacity() or 1
+    local fluid_used = self.device.getStoredFluidAmount() or 0
+    local fluid_capacity = self.device.getFluidStorageCapacity() or 1
+
     return {
       state = true,
-      temperature = 0,
-      energy_stored = stored,
-      energy_capacity = capacity,
-      efficiency = stored / capacity,
-      throughput = 0,
+      status = "online",
       custom = {
-        online_cpus = self.device.getOnlineCPUCount() or 0,
-        total_cpus = self.device.getCpuCount() or 0,
-        item_types = self.device.getItemCount() or 0,
-        fluid_types = self.device.getFluidCount() or 0,
-        item_storage_used = self.device.getStoredItemCount() or 0,
-        item_storage_capacity = self.device.getItemStorageCapacity() or 0,
-        fluid_storage_used = self.device.getStoredFluidAmount() or 0,
-        fluid_storage_capacity = self.device.getFluidStorageCapacity() or 0
+        item_types = item_types,
+        fluid_types = fluid_types,
+        item_storage_used = item_used,
+        item_storage_capacity = item_capacity,
+        fluid_storage_used = fluid_used,
+        fluid_storage_capacity = fluid_capacity
       }
     }
   end)

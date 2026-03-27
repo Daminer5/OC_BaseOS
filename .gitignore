@@ -5,6 +5,7 @@
 /bin/address.lua
 /bin/alias.lua
 /bin/cat.lua
+/bin/cd.lua
 /bin/clear.lua
 /bin/components.lua
 /bin/cp.lua
@@ -129,3 +130,7 @@ vt100.lua
 # keep local build artifacts out
 build/
 coverage/
+brgc/
+
+# Ignore debug logs and artifacts
+/debug/

@@ -5,39 +5,44 @@ local exporter_config = {
   -- Node identification
   node_id = "exporter",
   node_type = "exporter",
-  
-  -- Hardware configuration
+
+  -- InfluxDB Export settings
+  influx = {
+    url = "http://localhost:8086/write",
+    db = "oc_baseos",
+    user = "",
+    pass = "",
+    flush_interval = 5,
+  },
+
+  -- Legacy export settings (items/fluids)
   hardware = {
     inventory_side = "left",    -- Inventory to export from
     output_side = "right",      -- Output destination
     interface_type = "hopper",  -- hopper, pipe, etc.
   },
-  
-  -- Export settings
+
   export = {
     enabled = true,
     auto_export = true,
-    batch_size = 64,            -- items per batch
-    transfer_rate = 1,          -- items per tick
+    batch_size = 64,
+    transfer_rate = 1,
   },
-  
-  -- Filtering
+
   filter = {
     enabled = false,
-    whitelist = true,           -- true: whitelist, false: blacklist
-    items = {},                 -- Whitelisted/blacklisted items
+    whitelist = true,
+    items = {},
   },
-  
-  -- Scheduling
+
   schedule = {
     enabled = false,
-    intervals = {},             -- Time-based export intervals
+    intervals = {},
   },
-  
-  -- Monitoring
+
   monitoring = {
     enabled = true,
-    update_interval = 5,        -- seconds
+    update_interval = 5,
     track_exports = true,
   },
 }

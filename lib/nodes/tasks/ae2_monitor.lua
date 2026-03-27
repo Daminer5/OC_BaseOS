@@ -1,18 +1,17 @@
--- AE2 Monitor Task
--- Monitors Applied Energistics 2 ME networks and broadcasts status periodically
+-- AE2 Monitor Task (Item/Fluid levels only)
+-- Monitors AE2 storage network and sends lightweight status to orchestrator
 
 local component = require("component")
 local serialization = require("serialization")
 local computer = require("computer")
+local cfg = require("nodes.config.ae_storage")
 
 local modem = component.modem
 
--- Task configuration
-local cfg = {
+-- runtime defaults
+local task_cfg = {
   orchestrator_channel = 1234,
-  monitor_interval = 5,  -- seconds
-  critical_level = 0.05, -- 5% capacity
-  warning_level = 0.2    -- 20% capacity
+  monitor_interval = cfg.monitoring.update_interval or 5,
 }
 
 -- Import hardware layer
@@ -40,45 +39,85 @@ end
 
 local function broadcastStatus(networks)
   if #networks == 0 then return end
-  
+
   local status_list = {}
   for _, net_info in ipairs(networks) do
     local status = net_info.device:getStatus()
-    local items = net_info.device:getItems()
-    local fluids = net_info.device:getFluids()
-    
-    -- Limit item/fluid lists to prevent overly large broadcasts
-    local item_count = 0
-    local fluid_count = 0
-    for _ in pairs(items) do item_count = item_count + 1 end
-    for _ in pairs(fluids) do fluid_count = fluid_count + 1 end
-    
+
+    local item_used = status.custom and status.custom.item_storage_used or 0
+    local item_capacity = status.custom and status.custom.item_storage_capacity or 1
+    local fluid_used = status.custom and status.custom.fluid_storage_used or 0
+    local fluid_capacity = status.custom and status.custom.fluid_storage_capacity or 1
+
+    local item_pct = math.min(100, math.floor((item_used / item_capacity) * 100 + 0.5))
+    local fluid_pct = math.min(100, math.floor((fluid_used / fluid_capacity) * 100 + 0.5))
+
+    -- alert calculations
+    if cfg.monitoring.track_items and item_pct >= cfg.thresholds.storage_warning then
+      pcall(function()
+        local alerts = require("alerts")
+        alerts.createAlert("ae_storage", "item_capacity", alerts.SEVERITY.WARNING,
+          "AE2 item storage nearing capacity: "..item_pct.."%", {item_pct=item_pct})
+      end)
+    end
+
+    if cfg.monitoring.track_fluids and fluid_pct >= cfg.thresholds.storage_warning then
+      pcall(function()
+        local alerts = require("alerts")
+        alerts.createAlert("ae_storage", "fluid_capacity", alerts.SEVERITY.WARNING,
+          "AE2 fluid storage nearing capacity: "..fluid_pct.."%", {fluid_pct=fluid_pct})
+      end)
+    end
+
+    -- low item/fluid thresholds
+    if cfg.monitoring.track_items and cfg.thresholds.item_low and item_pct <= cfg.thresholds.item_low then
+      pcall(function()
+        local alerts = require("alerts")
+        alerts.createAlert("ae_storage", "item_low", alerts.SEVERITY.CRITICAL,
+          "AE2 item stock low: "..item_pct.."%", {item_pct=item_pct})
+      end)
+    end
+
+    if cfg.monitoring.track_fluids and cfg.thresholds.fluid_low and fluid_pct <= cfg.thresholds.fluid_low then
+      pcall(function()
+        local alerts = require("alerts")
+        alerts.createAlert("ae_storage", "fluid_low", alerts.SEVERITY.CRITICAL,
+          "AE2 fluid stock low: "..fluid_pct.."%", {fluid_pct=fluid_pct})
+      end)
+    end
+
     table.insert(status_list, {
       address = net_info.address,
       type = net_info.type,
       status = status,
-      item_count = item_count,
-      fluid_count = fluid_count
+      item_count = status.custom and status.custom.item_types or 0,
+      fluid_count = status.custom and status.custom.fluid_types or 0,
+      item_used = item_used,
+      item_capacity = item_capacity,
+      fluid_used = fluid_used,
+      fluid_capacity = fluid_capacity,
+      item_pct = item_pct,
+      fluid_pct = fluid_pct
     })
   end
-  
-  modem.broadcast(cfg.orchestrator_channel, serialization.serialize({
+
+  modem.broadcast(task_cfg.orchestrator_channel, serialization.serialize({
     type = "ae2_status",
     timestamp = os.time(),
     networks = status_list
   }))
 end
 
-local function run(task_cfg)
+local function run(task_config)
   -- Merge config
-  if task_cfg then
-    for k, v in pairs(task_cfg) do
-      cfg[k] = v
+  if task_config then
+    for k, v in pairs(task_config) do
+      task_cfg[k] = v
     end
   end
-  
-  modem.open(cfg.orchestrator_channel)
-  
+
+  modem.open(task_cfg.orchestrator_channel)
+
   local last_broadcast = 0
   local networks = findAE2Networks()
   

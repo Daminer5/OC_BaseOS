@@ -23,23 +23,23 @@ local ae_storage_config = {
   
   -- Display settings
   display = {
-    show_stored_power = true,
     show_item_count = true,
     show_fluid_amount = true,
     max_display_rows = 20,
   },
   
-  -- Thresholds
+  -- Thresholds (item/fluid levels)
   thresholds = {
-    power_warning = 10,        -- %
-    power_critical = 5,        -- %
-    storage_warning = 90,      -- %
+    item_low = 5,         -- percentage below which item alerts trigger
+    item_critical = 2,
+    fluid_low = 10,
+    fluid_critical = 5,
+    storage_warning = 90,
   },
-  
   -- Logging
   logging = {
     enabled = false,
-    log_interval = 60,         -- seconds
+    log_interval = 60,
   },
 }
 

@@ -1,6 +1,6 @@
 # OC_BaseOS
 
-OpenComputers Base OS - A distributed SCADA controller for OpenComputers mod in Minecraft.
+OpenComputers Base OS - A distributed SCADA controller for OpenComputers mod in Minecraft. Developed with 1.7.10, may work with newer versions
 
 Repository: https://github.com/Daminer5/OC_BaseOS
 
@@ -207,10 +207,58 @@ svc reload                 # Reload all services
 - Configure auto-scaling rules in `orchestrator.lua`.
 - Start with `orchestrator.run()`.
 
+### 10. BRCtrl - Big Reactors Control
+**Purpose**: Advanced auto-calibration system for Big Reactors installations with continuous optimization.
+
+**How it works**: Automatically calibrates reactor control rods for optimal efficiency, balances reactor output with turbine capacity, and provides emergency shutdown capabilities.
+
+**Features**:
+- **Auto-Calibration**: Continuously optimizes reactor efficiency by testing different control rod levels
+- **Grid Balancing**: Matches reactor power output with turbine consumption capacity
+- **Temperature Control**: Maintains optimal reactor temperatures through adaptive control
+- **Fuel Efficiency**: Optimizes fuel consumption rates
+- **Safety Monitoring**: Emergency shutdown on critical conditions (overheat, overspeed)
+- **Maintenance Alerts**: Monitors turbine health and rotor damage
+
+**Installation/Configuration**:
+- Deploy to Big Reactor nodes with both reactor and turbine components.
+- Run `br start` for continuous operation.
+- Use `br calibrate` for manual optimization runs.
+- Configure calibration parameters in `/lib/auto_calibration.lua`.
+
 ## Node Types & Services
 
 OC_BaseOS supports 8 specialized node types, each with tailored services and configurations:
 
+
+## New Safety & Telemetry Features
+
+✅ **Node heartbeats**: All nodes emit `heartbeat` every 1 second to supervisor.
+
+✅ **Sensor batching**: Nodes gather liveness and environmental data every 1 second, send `sensor_batch` every 3 seconds.
+
+✅ **AE2 storage behavior**: AE2 (`ae_storage` node) only tracks item/fluid levels (no energy/power metrics) and enforces low stock alerts on configured thresholds.
+
+✅ **5 min retention**: Supervisor DB keeps sensor history for 300 seconds for rolling analysis.
+
+✅ **MIA detection**:
+- `3s` no heartbeat = warning
+- `5s` no heartbeat = critical
+- `7s` no heartbeat = node flagged as MIA and may set `status = "mia"`
+
+✅ **SCRAM enforcement**:
+- Critical nuclear nodes (e.g., `de_reactor` analog) auto-shutdown when MIA or missing supervisor.
+- `de_reactor` event rule: if containment flood power >= 300kRF/t, trigger containment flood and SCRAM.
+
+✅ **InfluxDB exporter**: `exporter` node now supports configurable target host/port/db and writes metric points in line protocol.
+
+✅ **AE2/Storage Safety config**:
+- Multi-tier energy storage capacity and throughput
+- Reactor channel mapping and SCRAM mode toggle
+
+---
+
+This release focuses on robustness across distributed systems, making node loss and runaway reactors safer and telemetry easier to ingest into external dashboards.
 ### Node Types
 
 | Type                 | Hardware          | Purpose                              | Services                              |
@@ -353,12 +401,41 @@ svc status supervisor
 **Reactor Node** (Big Reactor):
 ```bash
 # Controls and monitors Big Reactor installations
-# Services: modem, reactor, monitor
 
 svc start breactor
 
+```
+
+**BR - Big Reactors Control** (Now with Auto-Calibration):
+```bash
+# Advanced auto-calibration system for Big Reactors
+# Automatically optimizes reactor efficiency and turbine performance
+# requirements: modem, reactor, monitor
+
+# Start full grid control with continuous auto-adjustment
+svc br start
+
+# Manual calibration run
+svc br calibrate
+
+# Check grid status
+svc grid status
+
+# Reactor-specific commands
+svc br reactor calibrate    # Calibrate reactor efficiency
+svc br reactor status       # Show reactor status
+
+# Turbine-specific commands
+svc br turbine calibrate    # Calibrate turbine performance
+svc br turbine status       # Show turbine status
+svc br turbine maintenance  # Check maintenance status
+
+# Emergency shutdown
+svc br scram
+
 # View system logs for reactor status
 tail -n 20 /var/logs/service.log
+
 ```
 
 **Worker Node** (Distributed Tasks):
@@ -366,6 +443,7 @@ tail -n 20 /var/logs/service.log
 # Distributed task execution
 # Services: modem, worker
 # Registers with orchestrator for task assignment
+# --WIP--
 
 svc start worker
 ```

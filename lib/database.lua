@@ -128,8 +128,62 @@ function M.updateHeartbeat(node_id, uptime, version, file_hashes)
   node.version = version or node.version
   node.file_hashes = file_hashes or node.file_hashes
   node.status = "online"
+  node.missed_heartbeats = 0
   
   return true
+end
+
+function M.recordSensors(node_id, sensors)
+  if not node_id or not sensors then return false end
+  local node = M.nodes[node_id]
+  if not node then return false end
+  node.sensor_history = node.sensor_history or {}
+  table.insert(node.sensor_history, sensors)
+
+  -- prune history to last 5 minutes
+  local cutoff = os.time() - 300
+  local i = 1
+  while i <= #node.sensor_history do
+    if node.sensor_history[i].timestamp < cutoff then
+      table.remove(node.sensor_history, i)
+    else
+      i = i + 1
+    end
+  end
+
+  return true
+end
+
+function M.getSensorHistory(node_id, seconds)
+  if not node_id then return nil end
+  local node = M.nodes[node_id]
+  if not node or not node.sensor_history then return {} end
+  seconds = seconds or 300
+  local cutoff = os.time() - seconds
+  local out = {}
+  for _, sample in ipairs(node.sensor_history) do
+    if sample.timestamp >= cutoff then
+      table.insert(out, sample)
+    end
+  end
+  return out
+end
+
+function M.pruneAllSensorHistory(max_age_seconds)
+  max_age_seconds = max_age_seconds or 300
+  local cutoff = os.time() - max_age_seconds
+  for _, node in pairs(M.nodes) do
+    if node.sensor_history then
+      local i = 1
+      while i <= #node.sensor_history do
+        if node.sensor_history[i].timestamp < cutoff then
+          table.remove(node.sensor_history, i)
+        else
+          i = i + 1
+        end
+      end
+    end
+  end
 end
 
 -- =============================
