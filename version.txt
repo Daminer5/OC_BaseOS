@@ -1,1 +1,2 @@
+#For version control, and making sure all nodes are in sync with each other.
 v1.0.0-dev
