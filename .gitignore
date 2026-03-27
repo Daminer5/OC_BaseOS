@@ -15,7 +15,6 @@
 bit32.lua
 buffer.lua
 colors.lua
-database.lua
 devfs.lua
 event.lua
 filesystem.lua
