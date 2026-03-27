@@ -120,13 +120,52 @@ local function detectHardware()
   return hw
 end
 
-local function inferNodeType(hw)
-  if hw.gpu and hw.screen then return "hmi" end
-  if hw.reactor then return "reactor" end
-  if hw.ae2 then return "storage" end
-  if hw.storage then return "database" end
-  if hw.modem then return "worker" end
-  return "generic"
+local function probeNetwork()
+  if not component.isAvailable("modem") then
+    return nil
+  end
+  
+  local modem = component.modem
+  modem.open(1234)
+  
+  -- Send broadcast probe
+  modem.broadcast(1234, "supervisor_probe")
+  
+  local probed = {}
+  local deadline = computer.uptime() + 2.0
+  
+  repeat
+    local _, _, from, port, distance, msg_type = event.pull(0.1, "modem_message")
+    if msg_type then
+      if not probed[from] then
+        probed[from] = true
+      end
+    end
+  until computer.uptime() >= deadline
+  
+  modem.close(1234)
+  return probed
+end
+
+local function recommendNodeType(hw, network_nodes)
+  -- If GPU + screen: suggest HMI but don't force it
+  if hw.gpu and hw.screen then return "hmi", "GPU+Screen detected" end
+  
+  -- If reactor: suggest reactor
+  if hw.reactor then return "reactor", "Reactor detected" end
+  
+  -- If AE2: suggest storage
+  if hw.ae2 then return "storage", "AE2 system detected" end
+  
+  -- If network available and no obvious hardware: suggest orchestrator
+  if network_nodes and next(network_nodes) then
+    return "orchestrator", "Network detected, recommending coordinator role"
+  end
+  
+  -- If modem only: suggest worker
+  if hw.modem then return "worker", "Modem only - worker node" end
+  
+  return "generic", "No special hardware detected"
 end
 
 log("Starting installation from: " .. github_base)
@@ -157,8 +196,20 @@ end
 log("Version: " .. version_data:gsub("\n", ""))
 
 local hw = detectHardware()
-local node_type = inferNodeType(hw)
-log("Node type: " .. node_type)
+log("Detecting network...")
+local network_nodes = probeNetwork()
+local probe_result = network_nodes and next(network_nodes) and "(found nodes)" or "(no nodes found)"
+log("Network probe " .. probe_result)
+
+-- Get recommendation
+local recommended_type, reason = recommendNodeType(hw, network_nodes)
+log("Recommendation: " .. recommended_type .. " (" .. reason .. ")")
+
+-- Ask user for confirmation/override
+io.write("Node type [" .. recommended_type .. "]: ")
+local user_input = io.read()
+local node_type = (user_input and user_input ~= "") and user_input or recommended_type
+log("Selected node type: " .. node_type)
 
 local filelist = {}
 if manifest.files then
