@@ -44,7 +44,21 @@ local function writeFile(path, data)
 end
 
 local function loadManifest(data)
-  local ok, m = pcall(load, "return " .. data)
+  if not data or type(data) ~= "string" then
+    return nil
+  end
+
+  local chunk = data
+  if not chunk:match("^%s*return%s+") then
+    chunk = "return " .. chunk
+  end
+
+  local fn, err = load(chunk, "manifest")
+  if not fn then
+    return nil
+  end
+
+  local ok, m = pcall(fn)
   if not ok or type(m) ~= "table" then
     return nil
   end
