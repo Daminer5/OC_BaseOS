@@ -526,7 +526,7 @@ end
 -- ============= MAIN EXECUTION ============= 
 
 local function main()
-  local args = {...}
+  local args = {}
   local nodeType = args[1]
   
   -- If no node type provided, detect it
