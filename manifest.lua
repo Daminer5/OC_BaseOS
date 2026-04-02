@@ -75,7 +75,7 @@ return {
     },
     energy_storage = {
       "/lib/hardware/energy_storage.lua",
-      "/lib/nodes/config/energy_storage.lua"
+      "/lib/nodes/config/energy_storage.lua",
       "/lib/nodes/energy_storage/Enderio_Energy.lua",
       "/lib/nodes/config/Enderio_Energy.lua",
       "/lib/nodes/energy_storage/MEK_Energy.lua",

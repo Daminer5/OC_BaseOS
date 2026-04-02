@@ -10,6 +10,7 @@ local computer = require("computer")
 local db = require("database")
 local alerts = require("alerts")
 local cfg = require("/lib/nodes/config/exporter")
+local hal = require("/lib/hardware/hal")
 
 local exporter = {}
 exporter.name = "exporter"

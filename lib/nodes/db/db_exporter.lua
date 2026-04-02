@@ -9,8 +9,14 @@ local function loadNodes()
   if not f then return {} end
   local data = f:read("*a")
   f:close()
-  local ok, tbl = pcall(loadstring(data))
-  if ok then return tbl() end
+  local chunk, err = load(data)
+  if not chunk then
+    return {}
+  end
+  local ok, tbl = pcall(chunk)
+  if ok and type(tbl) == "table" then
+    return tbl
+  end
   return {}
 end
 
