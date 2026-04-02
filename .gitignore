@@ -132,5 +132,11 @@ build/
 coverage/
 brgc/
 
+# Ignore Testing artifacts
+/cache/
+/etc/edit.cfg
+/etc/opdata.svd
+/etc/oppm.cfg
+
 # Ignore debug logs and artifacts
 /debug/
