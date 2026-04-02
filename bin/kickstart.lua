@@ -1,4 +1,4 @@
-#!/usr/bin/env lua
+#!/bin/lua
 -- Service Kickstarter
 -- Initializes and starts node services after installation or at startup
 -- Usage: kickstart.lua [node-type] [root-path]

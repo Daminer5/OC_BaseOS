@@ -262,7 +262,7 @@ log("Installation complete!")
 log("Starting node services...")
 local shell_ok, shell = pcall(require, "shell")
 if shell_ok and shell then
-  local result = shell.execute("kickstart.lua " .. node_type)
+  local result = shell.execute("/bin/kickstart.lua " .. node_type)
   if result == 0 then
     log("Services started successfully!")
   else
