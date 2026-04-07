@@ -430,12 +430,8 @@ svc br turbine calibrate    # Calibrate turbine performance
 svc br turbine status       # Show turbine status
 svc br turbine maintenance  # Check maintenance status
 
-# Emergency shutdown
-svc br scram
-
 # View system logs for reactor status
 tail -n 20 /var/logs/service.log
-
 ```
 
 **Worker Node** (Distributed Tasks):

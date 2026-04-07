@@ -95,7 +95,7 @@ local function executeCommand(command, serviceName)
 end
 
 local function main()
-  local args = shell.parse(...)
+  local args = shell.parse()
   
   if #args == 0 then
     io.write("Service Management Utility\n")
