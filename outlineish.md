@@ -1,12 +1,4 @@
-Working on creating a base control/monitoring program in open computers for 1.7.10. For the number of different machines and other multi block structures I'm thinking of having everything modularized for a reduction in coding complexity.
-
-That’s exactly the right instinct—modularizing in Minecraft (especially with OpenComputers on 1.7.10) will save you a ton of pain once your system scales.
-
-Let me give you a clean architecture that works well for complex OC setups with lots of multiblocks and machines.
-
-🧠 Core Design Philosophy
-
-Think in layers, not machines:
+Thinking in layers, not machines:
 
 1. Hardware Abstraction Layer (HAL)
 2. Device Modules (per machine type)
@@ -16,7 +8,8 @@ Think in layers, not machines:
 
 Each layer should not care how the others are implemented internally.
 
-🧱 Suggested File Structure
+Suggested File Structure
+```
 /lib/
   component_wrapper.lua
   network.lua
@@ -38,13 +31,17 @@ Each layer should not care how the others are implemented internally.
 
 /main.lua
 /config.lua
-🔌 1. Hardware Abstraction (HAL)
+
+```
+
+# 1. Hardware Abstraction (HAL)
 
 Wrap raw OpenComputers components so the rest of your code never touches them directly.
 
 Example:
-
 -- lib/component_wrapper.lua
+```
+
 local component = require("component")
 
 local M = {}
@@ -59,14 +56,14 @@ function M.getReactor(address)
 end
 
 return M
-
-👉 If you ever swap mods (e.g. Big Reactors → something else), you only rewrite this layer.
-
-⚙️ 2. Device Modules (Per Multiblock Type)
+```
+# 2. Device Modules (Per Multiblock Type)
 
 Each machine type gets its own module with standardized methods.
 
 -- devices/reactor.lua
+
+```
 local Reactor = {}
 Reactor.__index = Reactor
 
@@ -86,16 +83,19 @@ function Reactor:setActive(state)
 end
 
 return Reactor
+```
+Now all reactors behave the same, regardless of physical implementation.
 
-👉 Now all reactors behave the same, regardless of physical implementation.
-
-🌐 3. Network Layer (Optional but powerful)
+# 3. Network Layer (Optional but powerful)
 
 If you're using multiple computers:
 
 Use modem messages
 Define a simple protocol
+
 -- lib/network.lua
+
+```
 local component = require("component")
 local modem = component.modem
 
@@ -110,16 +110,18 @@ function M.broadcast(msg)
 end
 
 return M
-
-👉 Add:
+```
+Add:
 
 message types (STATUS, COMMAND)
 IDs for each machine
-🧩 4. Controllers (Logic Layer)
+
+# 4. Controllers (Logic Layer)
 
 This is where automation lives.
 
 -- controllers/reactor_controller.lua
+```
 local Controller = {}
 
 function Controller.run(reactor)
@@ -133,24 +135,27 @@ function Controller.run(reactor)
 end
 
 return Controller
-
-👉 Controllers should NEVER:
+```
+Controllers should NEVER:
 
 care about component addresses
 call raw component methods
-🖥️ 5. UI Layer
+
+# 5. UI Layer
 
 Keep UI completely separate from logic.
 
 Pull data from controllers/devices
 Render to screen
 No direct hardware access
+
 -- ui/dashboard.lua
+```
 function draw(status)
   print("Temp:", status.temp)
   print("RF:", status.rf)
 end
-🔄 Main Loop Example
+Main Loop Example
 local reactor = require("devices/reactor").new(hw)
 local controller = require("controllers/reactor_controller")
 
@@ -158,15 +163,16 @@ while true do
   controller.run(reactor)
   os.sleep(1)
 end
-🔧 Key Patterns That Will Save You Later
-✅ 1. Standardized Interfaces
+```
+## Key Patterns That Will Save You Later
+# 1. Standardized Interfaces
 
 Every device should support:
-
+```
 :getStatus()
 :enable()
 :disable()
-✅ 2. Config-Driven Setup
+2. Config-Driven Setup
 -- config.lua
 return {
   reactors = {
@@ -174,32 +180,34 @@ return {
     {address = "yyyy"}
   }
 }
+```
+No hardcoding addresses in logic.
 
-👉 No hardcoding addresses in logic.
-
-✅ 3. Event-Driven (Advanced)
+# 3. Event-Driven (Advanced)
 
 Instead of polling:
 
 Use signals (event.pull)
 React to changes
-✅ 4. Logging System
-logger.info("Reactor overheating")
 
+# 4. Logging System
+```
+logger.info("Reactor overheating")
+```
 You’ll thank yourself later.
 
-✅ 5. Fail-Safe Defaults
+# 5. Fail-Safe Defaults
 
 If anything errors:
 
 shut machines down
 don’t leave reactors running
-⚠️ Common Pitfalls in OC 1.7.10
+Common Pitfalls in OC 1.7.10
 Component calls are slow → cache values
 Limited memory → avoid huge tables
 Network packets can drop → design retries
 Chunk loading issues → machines “disappear”
-🚀 Scaling Strategy
+Scaling Strategy
 
 Start with:
 
@@ -212,45 +220,42 @@ Then expand:
 multiple machines
 central controller
 distributed nodes
-If you want next step:
 
-I can help you:
+# Q: What mods/multiblocks are you planning to integrate?
 
-Build a full working starter framework
-Add modem-based distributed control
-Design a touchscreen UI system
-Or tailor it to specific mods (Big Reactors, IC2, Mekanism, etc.)
+- All of them eventually, but to start with. IC2, Ender IO, Thermal expansion, Big Reactors, and AE2. 
+- With AE2 I only need to watch the capacity of the drives, and how many are available.
+- Currently with Ender IO and Thermal expansion I need to monitor the energy capacity, and the throughput. 
+- Big reactors is just a passive reactor, with plans to swap to a steam generation one. 
+- Each one of these needs to be a separate computer. Along with one for the database, and one for the GUI. 
+- These two systems may need to scale up as time goes on. 
 
-What mods/multiblocks are you planning to integrate?
+# distributed SCADA system inside Minecraft using OpenComputers
 
-All of them eventually, but to start with. IC2, Ender IO, Thermal expansion, Big Reactors, and AE2. With AE2 I only need to watch the capacity of the drives, and how many are available. Currently with Ender IO and Thermal expansion I need to monitor the energy capacity, and the throughput. Big reactors is just a passive reactor, with plans to swap to a steam generation one. Each one of these needs to be a separate computer. Along with one for the database, and one for the GUI. These two systems may need to scale up as time goes on. 
+node-based architecture with a central data bus, not just “modular code.”
 
-You’re basically describing a distributed SCADA system inside Minecraft using OpenComputers—and your instincts are solid. The key now is to structure it so adding new mods/machines later doesn’t explode complexity.
-
-What you want is node-based architecture with a central data bus, not just “modular code.”
-
-🧠 High-Level Architecture (What you should build)
 [ Machine Nodes ]  →  [ Message Bus ]  →  [ Database Node ]  →  [ GUI Node ]
          ↑                                              ↓
          └─────────────── Commands / Control ────────────┘
 Each system has a single responsibility:
-🖥️ Machine Node (one per multiblock/system)
+Machine Node (one per multiblock/system)
 Talks directly to hardware
 Normalizes data
 Sends periodic updates
-🗄️ Database Node
+Database Node
 Stores latest state + history
 Handles queries
 Acts as “source of truth”
-🖥️ GUI Node
+GUI Node
 Displays data
 Sends commands
 NEVER talks to hardware directly
-🔌 Machine Node Design (This is your foundation)
+Machine Node Design (This is your foundation)
 
 Each node should expose a standard schema, regardless of mod.
 
 Example normalized message:
+```
 {
   type = "status",
   node = "reactor_1",
@@ -263,11 +268,12 @@ Example normalized message:
   },
   timestamp = os.time()
 }
-🧩 Mapping Your Mods → Standard Types
-⚡ Power Storage (Ender IO, Thermal Expansion)
+```
+Mapping Your Mods → Standard Types
+Power Storage (Ender IO, Thermal Expansion)
 
 Normalize both to:
-
+```
 {
   class = "energy_storage",
   energy_stored,
@@ -275,10 +281,11 @@ Normalize both to:
   input_rate,
   output_rate
 }
-🔥 Big Reactors (Passive → Steam later)
+```
+Big Reactors (Passive → Steam later)
 
 Start with:
-
+```
 {
   class = "power_generator",
   energy_output,
@@ -286,15 +293,17 @@ Start with:
   casing_temp,
   fuel_level
 }
-
+```
 Later (steam):
-
+```
 {
   steam_rate,
   rotor_speed,
   efficiency
 }
-💾 AE2 Monitoring
+```
+AE2 Monitoring
+```
 {
   class = "storage_network",
   total_bytes,
@@ -303,10 +312,11 @@ Later (steam):
   drives_total,
   drives_free
 }
+```
+Don’t expose raw AE2 API — normalize it here.
 
-👉 Don’t expose raw AE2 API — normalize it here.
-
-⚙️ IC2 Machines
+IC2 Machines
+```
 {
   class = "machine",
   progress,
@@ -315,7 +325,8 @@ Later (steam):
   input_slots,
   output_slots
 }
-🌐 Messaging Layer (CRITICAL)
+```
+Messaging Layer (CRITICAL)
 
 Use modem + a simple protocol.
 
@@ -326,6 +337,7 @@ Message Types
 "response"  -- DB replying
 "heartbeat" -- node alive
 Example Send Loop (Machine Node)
+```
 while true do
   local data = device:getStatus()
 
@@ -339,65 +351,72 @@ while true do
 
   os.sleep(1)
 end
-🗄️ Database Node Design
+```
+Database Node Design
 
-This is where most people mess up.
+This is where the fun begins
 
-You want TWO layers:
+Need TWO layers:
 1. Current State Cache
+```
 state = {
   reactor_1 = {...},
   storage_1 = {...}
 }
+```
 2. Time-Series History (optional but powerful)
+```
 history = {
   reactor_1 = {
     {time=..., temp=...},
     {time=..., temp=...}
   }
 }
-
-👉 Keep history bounded (OC memory limits will bite you)
+```
+Keep history bounded (OC memory limits will bite you)
 
 DB Responsibilities
 Store latest state
 Respond to GUI queries
 Optionally aggregate data
-🖥️ GUI Node Design
+GUI Node Design
 
 The GUI node should behave like a client, not a controller.
 
 It should:
 Query DB:
+```
 { type = "query", target = "all" }
+```
 Render:
 Power levels
 Reactor temps
 AE2 usage
 Send commands:
+```
 { type = "command", target = "reactor_1", action = "disable" }
-⚖️ Scaling Strategy (Important for your plan)
+```
+Scaling Strategy
 
-You already anticipated this correctly.
-
-When things grow:
-🧠 Split Database
+Split Database
 db_power.lua
 db_storage.lua
-🖥️ Multiple GUIs
+Multiple GUIs
 Wall display
 Portable tablet
 Debug console
-🌐 Message Routing (advanced)
+Message Routing (advanced)
 
 Introduce:
 
 Channels per class (power, storage, etc.)
 Or message filtering
-🔒 Reliability (THIS will matter later)
-Add heartbeats:
-{ type = "heartbeat", node = "reactor_1" }
 
+Reliability (THIS will matter later)
+Add heartbeats:
+```
+{ type = "heartbeat", node = "reactor_1" }
+```
 DB marks node offline if:
 
 no update in X seconds
@@ -406,24 +425,24 @@ Fail-safe logic (machine nodes)
 If connection to DB is lost:
 
 reactor throttles or shuts down
-⚡ Performance Tips (OC 1.7.10 realities)
+Performance Tips (OC 1.7.10 realities)
 Avoid sending huge tables
 Compress keys:
 -- instead of:
 energy_stored
 
 -- use:
-e
+
 Limit update rate:
 1 sec for power
 2–5 sec for slower systems
-🧱 Suggested Minimum Viable Build
+Suggested Minimum Viable Build
 
 Start with just:
 
-✅ 1 Machine Node (Big Reactor)
-✅ 1 Database Node
-✅ 1 Simple GUI
+1 Machine Node (Big Reactor)
+1 Database Node
+1 Simple GUI
 
 Skip:
 
@@ -433,34 +452,12 @@ fancy UI
 
 Once stable → expand.
 
-🔥 What You’re Building (Big Picture)
-
-This ends up being:
-
 A distributed telemetry system
 With standardized device drivers
 And a central state engine
 
-Which is exactly how real industrial systems are designed.
 
-If you want next step
-
-I can help you build:
-
-A drop-in node template (copy/paste for every machine)
-A fully working DB server
-A basic touchscreen GUI (OpenComputers GPU + resolution handling)
-Or help you optimize for low memory footprint (important later)
-
-What do you want to tackle next—the node template, database, or GUI?
-
-Github will handle deployment and updates for nodes. Also would like to export data from the database to a local InfluxDB or Prometheus server. This will be handled by another computer, which also may handle updating the other nodes as updates come out on GitHub. 
-
-That’s a really solid evolution—you’re basically adding a gateway/export + orchestrator node, which turns your OC network into something that can integrate with real-world monitoring stacks. Nice.
-
-Let’s structure this cleanly so it doesn’t become fragile later.
-
-🧠 Updated Architecture
+Updated Architecture
 [ Machine Nodes ]
         ↓
 [ Database Node ] ←→ [ GUI Node ]
@@ -471,35 +468,37 @@ Let’s structure this cleanly so it doesn’t become fragile later.
 
 This new node has two distinct responsibilities:
 
-📤 Metrics Exporter
-🔄 Deployment / Update Manager
+Metrics Exporter
+Deployment / Update Manager
 
 Keep those logically separate—even if they run on the same computer.
 
-📤 Metrics Export Design
+Metrics Export Design
 
 You have two good targets:
 
 InfluxDB → easier write API, better for OC
 Prometheus → requires HTTP endpoint (harder in OC)
 
-👉 Recommendation:
+Recommendation:
 Start with InfluxDB, optionally add Prometheus later via a bridge.
 
-🔌 How Data Flows
+How Data Flows
 Database Node → Exporter Node → HTTP → InfluxDB
 
 Exporter pulls from DB (not from machines directly).
 
-📦 Data Format (Normalize Early)
+Data Format (Normalize Early)
 
 Convert your DB state into line protocol:
 
 Example:
-
+```
 reactor,node=reactor_1 temp=820,rf=1200 1710000000
 storage,node=ae2_1 used=500000,free=200000 1710000000
-🧾 Exporter Logic
+```
+Exporter Logic
+```
 while true do
   local state = queryDB("all")
 
@@ -513,20 +512,21 @@ while true do
 
   os.sleep(5)
 end
-🌐 HTTP in OpenComputers
+```
+HTTP in OpenComputers
 
 OC supports HTTP if enabled in config.
-
+```
 local http = require("internet")
 
 http.request(
   "http://influx.local:8086/write?db=minecraft",
   payload
 )
+```
+Keep payloads small (batch but don’t flood)
 
-👉 Keep payloads small (batch but don’t flood)
-
-📊 Prometheus Option (Later)
+Prometheus Option (Later)
 
 Prometheus expects a scrape endpoint, like:
 
@@ -540,27 +540,27 @@ Export → InfluxDB
 Use:
 Telegraf
 or Influx → Prometheus bridge
-🔄 Orchestrator / Update System
+Orchestrator / Update System
 
 This is where things get interesting.
 
 You want:
 
 GitHub → one node → push updates → all nodes
-🧱 Update Architecture
+Update Architecture
 GitHub
    ↓
 [ Orchestrator Node ]
    ↓
 [ Machine Nodes pull updates ]
 
-👉 Nodes should PULL, not be pushed to
+Nodes should PULL, not be pushed to
 (much more reliable in OC)
 
-📥 Node Update Agent
+Node Update Agent
 
 Each node runs:
-
+```
 while true do
   if updateAvailable() then
     downloadUpdate()
@@ -570,7 +570,8 @@ while true do
 
   os.sleep(300)
 end
-📡 How to Check GitHub
+```
+How to Check GitHub
 
 Use raw file endpoint:
 
@@ -578,7 +579,8 @@ https://raw.githubusercontent.com/Daminer5/OC_BaseOS/main/version.txt
 
 Compare with local version.
 
-⬇️ Download Updates
+Download Updates
+```
 local internet = require("internet")
 
 local function download(url, path)
@@ -591,26 +593,28 @@ local function download(url, path)
 
   file:close()
 end
-🧠 Orchestrator Role
+```
+Orchestrator Role
 
 Instead of every node hitting GitHub:
 
 Better approach:
 Orchestrator polls GitHub
 Broadcasts:
+```
 { type = "update", version = "1.2.0" }
-
+```
 Nodes then:
 
 decide to update
 pull from GitHub (or orchestrator cache)
-🚀 Even Better (Scaling)
+Even Better (Scaling)
 
 Orchestrator acts as a local mirror/cache:
 
 downloads update once
 nodes fetch from it (LAN speed)
-🔒 Safety Mechanisms (VERY IMPORTANT)
+Safety Mechanisms (VERY IMPORTANT)
 1. Dual File System (Soft)
 
 Keep:
@@ -629,8 +633,9 @@ revert to previous version
 
 Don’t update everything at once:
 
-reactors last 😄
-⚡ Performance + Reliability Tips
+reactors last
+
+Performance + Reliability Tips
 Exporter Node
 Run every 5–10 seconds (not 1s)
 Batch writes
@@ -642,7 +647,8 @@ Use channels per message type:
 1000 = status
 2000 = control
 3000 = updates
-🧩 Clean Separation (Key to Long-Term Sanity)
+
+Clean Separation (Key to Long-Term Sanity)
 Responsibility	Node
 Hardware control	Machine nodes
 State storage	DB node
@@ -652,7 +658,7 @@ Updates	Orchestrator node
 
 Even if exporter + orchestrator share hardware, keep code separate.
 
-🔥 What You End Up With
+What You End Up With
 
 You’re effectively building:
 
@@ -679,16 +685,16 @@ Good call—get the updater right early and everything else becomes easier to ev
 
 What you want is a pull-based, fail-safe updater with versioning + rollback, coordinated by your orchestrator but not dependent on it.
 
-🧠 Updater Design Goals
-✅ Nodes pull updates (never blindly pushed)
-✅ Version-aware (no unnecessary downloads)
-✅ Atomic updates (no partial installs)
-✅ Rollback if broken
-✅ Works even if orchestrator is offline
-🧱 Repository Layout (GitHub)
+Updater Design Goals
+Nodes pull updates (never blindly pushed)
+Version-aware (no unnecessary downloads)
+Atomic updates (no partial installs)
+Rollback if broken
+Works even if orchestrator is offline
+Repository Layout (GitHub)
 
 Keep this simple and predictable:
-
+```
 /branch: main
 
 /version.txt
@@ -707,12 +713,13 @@ Keep this simple and predictable:
 
 /updater/
   updater.lua
-📄 version.txt
+version.txt
+```
 1.2.0
-📄 manifest.lua (CRITICAL)
+manifest.lua (CRITICAL)
 
 Defines what files each node needs:
-
+```
 return {
   version = "1.2.0",
 
@@ -733,16 +740,19 @@ return {
     }
   }
 }
-🧠 Node Identity
+```
+Node Identity
 
 Each node has a config:
 
 -- /config.lua
+```
 return {
   node_type = "reactor",
   version = "1.0.0"
 }
-🔄 Update Flow (Node Side)
+```
+Update Flow (Node Side)
 1. Check remote version
 2. Compare with local
 3. If newer:
@@ -752,13 +762,15 @@ return {
     → validate
     → switch
     → reboot
-🌐 URLs
+URLs
 
 Use raw GitHub:
 
 local BASE = "https://raw.githubusercontent.com/Daminer5/OC_BaseOS/main"
-🧩 Core Updater Module
+Core Updater Module
+
 updater.lua (drop-in)
+```
 local internet = require("internet")
 local serialization = require("serialization")
 
@@ -865,10 +877,11 @@ function updater.run()
 end
 
 return updater
-🚀 Boot Script Integration
+```
+Boot Script Integration
 
 Your main program should call updater periodically:
-
+```
 local updater = require("updater")
 
 -- check every 5 minutes
@@ -883,7 +896,8 @@ while true do
   -- normal program here
   os.sleep(1)
 end
-🔒 Add Rollback (IMPORTANT)
+```
+Add Rollback (IMPORTANT)
 
 Right now, if update fails → you're dead.
 
@@ -899,7 +913,7 @@ if not ok then
   os.execute("mv /backup /app")
   os.execute("reboot")
 end
-📡 Orchestrator Integration (Optional but Recommended)
+Orchestrator Integration (Optional but Recommended)
 
 Instead of polling GitHub constantly:
 
@@ -911,7 +925,7 @@ Nodes:
 
 mark update flag
 run updater immediately
-⚡ Improvements You Can Add Later
+Improvements You Can Add Later
 🔹 Delta Updates
 
 Only download changed files
@@ -927,12 +941,12 @@ Prevent malicious code
 🔹 Channel Switching
 stable
 beta
-⚠️ OC-Specific Gotchas
+OC-Specific Gotchas
 HTTP may be disabled in config → enable it
 GitHub rate limits (rare but possible)
 File system is slow → minimize writes
 No real mkdir -p → may need custom dir creation
-✅ What You Have Now
+What You Have Now
 
 With this:
 
@@ -940,21 +954,9 @@ Every node can self-update
 Safe(ish) rollback exists
 Works standalone or with orchestrator
 Scales cleanly
-If you want next step
 
-We can tighten this up further with:
 
-A robust filesystem layer (OC-safe mkdir, copy, etc.)
-Hash-based validation
-Or build the orchestrator-side update broadcaster/cache
-
-I’d recommend next: making this updater more fault-tolerant (hash + staged validation) before deploying widely.
-
-Another good function is to have the nodes send a version number they're actively running to the DB so the exporter can monitor which ones haven't updated in a while so we can investigate the issue.
-
-That’s not just a “good function”—that’s exactly how you keep a distributed system from quietly drifting out of sync. You’re basically adding fleet observability, which will save you a ton of debugging later.
-
-Let’s fold this cleanly into your existing design so it doesn’t become bolted-on.
+# DBs
 
 🧠 What You Want (Conceptually)
 
